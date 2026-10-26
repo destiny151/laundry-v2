@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A mobile-first laundry room booking app for shared machines."
+    />
+    <title>Laundry room</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">◌</span>
+          <span class="brand-name">Laundry</span>
+        </div>
+        <button class="ghost-button" id="refreshButton" type="button">Refresh</button>
+      </header>
+
+      <main class="app-content">
+        <section id="bookingSection" class="panel booking-panel" aria-live="polite"></section>
+
+        <section class="panel overview-panel" aria-labelledby="overview-title">
+          <div class="panel-heading">
+            <h1 id="overview-title">Laundry room</h1>
+            <span class="meta-badge">Today</span>
+          </div>
+
+          <div id="machineGrid" class="machine-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="panel helper-panel" aria-labelledby="helper-title">
+          <div class="panel-heading compact-heading">
+            <h2 id="helper-title">Helpful guides</h2>
+          </div>
+
+          <div class="helper-actions">
+            <button class="helper-tab active" data-helper="size" type="button">
+              Load size
+            </button>
+            <button class="helper-tab" data-helper="temperature" type="button">
+              Temperature
+            </button>
+          </div>
+
+          <div id="helperContent" class="helper-content" aria-live="polite"></div>
+        </section>
+
+        <button id="bookSlotButton" class="primary-button" type="button">
+          Book a slot
+        </button>
+      </main>
+    </div>
+
+    <div id="bookingModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+          <h2 id="modalTitle">Book a slot</h2>
+          <button class="close-button" id="closeModalButton" type="button" aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <div class="field-group">
+          <label for="machineSelect">Machine</label>
+          <div id="machineSelect" class="choice-list" aria-label="Select machine"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label for="bookingDate">Date</label>
+            <input id="bookingDate" type="date" />
+          </div>
+
+          <div class="field-group">
+            <label for="bookingTime">Time</label>
+            <input id="bookingTime" type="time" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Clothes type</label>
+          <div id="clothesOptions" class="choice-list" aria-label="Choose clothes type"></div>
+        </div>
+
+        <div class="field-group">
+          <label>Suggested setting</label>
+          <div id="temperatureHelp" class="temperature-help"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="cancelBookingButton" class="secondary-button" type="button">Cancel</button>
+          <button id="confirmBookingButton" class="primary-button" type="button">Confirm booking</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
