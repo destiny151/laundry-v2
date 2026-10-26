@@ -23,6 +23,13 @@
       <main class="app-content">
         <section id="bookingSection" class="panel booking-panel" aria-live="polite"></section>
 
+        <section id="myMachinesSection" class="panel my-machines-panel" aria-labelledby="my-machines-title">
+          <div class="panel-heading">
+            <h2 id="my-machines-title">My machines</h2>
+          </div>
+          <div id="myMachinesList" aria-live="polite"></div>
+        </section>
+
         <section class="panel overview-panel" aria-labelledby="overview-title">
           <div class="panel-heading">
             <h1 id="overview-title">Laundry room</h1>
@@ -52,6 +59,8 @@
         <button id="bookSlotButton" class="primary-button" type="button">
           Book a slot
         </button>
+
+        <button id="resetDemoButton" class="reset-demo-link" type="button">Reset demo</button>
       </main>
     </div>
 
@@ -67,6 +76,11 @@
         <div class="field-group">
           <label for="machineSelect">Machine</label>
           <div id="machineSelect" class="choice-list" aria-label="Select machine"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="userNameInput">Your name or flat number</label>
+          <input id="userNameInput" type="text" placeholder="Keza, Flat 3B" />
         </div>
 
         <div class="field-row">

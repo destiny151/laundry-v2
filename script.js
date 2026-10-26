@@ -1,5 +1,12 @@
 const STORAGE_KEY = 'laundry-room-v1';
 const DEFAULT_HELPER = 'size';
+const DEFAULT_USER = 'Keza, Flat 3B';
+const SAMPLE_USER_BOOKINGS = [
+  { flat: 'Flat 2A', machineId: 'washer-1', label: 'Flat 2A\'s laundry is done' },
+  { flat: 'Flat 1C', machineId: 'dryer-1', label: 'Flat 1C\'s laundry is done' },
+  { flat: 'Flat 2A', machineId: 'washer-3', label: 'Flat 2A\'s laundry is done' },
+  { flat: 'Flat 5D', machineId: 'dryer-2', label: 'Flat 5D\'s laundry is done' },
+];
 
 const clothesGuide = {
   cotton: { label: 'Cotton clothes', temp: 60, note: 'Good for towels, bedding and everyday cotton.' },
@@ -25,6 +32,7 @@ const sampleBookings = [
     date: getDateInDays(0),
     time: getRecentPastTime(8),
     clothesType: 'cotton',
+    owner: 'Flat 2A',
     createdAt: Date.now(),
     status: 'done',
     cache: false,
@@ -35,8 +43,31 @@ const sampleBookings = [
     date: getDateInDays(0),
     time: getRecentPastTime(8),
     clothesType: 'delicates',
+    owner: 'Flat 5D',
     createdAt: Date.now() - 1000 * 60 * 5,
     status: 'done',
+    cache: false,
+  },
+  {
+    id: 'sample-booking-3',
+    machineId: 'washer-1',
+    date: getDateInDays(0),
+    time: getCurrentLocalTimeValue(),
+    clothesType: 'cotton',
+    owner: DEFAULT_USER,
+    createdAt: Date.now(),
+    status: 'scheduled',
+    cache: false,
+  },
+  {
+    id: 'sample-booking-4',
+    machineId: 'dryer-1',
+    date: getDateInDays(0),
+    time: getCurrentLocalTimeValue(),
+    clothesType: 'cotton',
+    owner: 'Flat 1C',
+    createdAt: Date.now(),
+    status: 'scheduled',
     cache: false,
   },
 ];
@@ -46,7 +77,9 @@ const state = {
   selectedMachineId: null,
   selectedClothesType: 'cotton',
   activeMachineType: null,
+  compactBooking: false,
   bookings: [],
+  userName: DEFAULT_USER,
 };
 
 function getDateInDays(offset) {
@@ -106,6 +139,14 @@ function safeLoad() {
   }
 }
 
+function getStoredUserName() {
+  const saved = safeLoad();
+  if (saved && typeof saved.userName === 'string' && saved.userName.trim()) {
+    return saved.userName;
+  }
+  return DEFAULT_USER;
+}
+
 function initialiseStorage() {
   const existing = safeLoad();
   const today = getDateInDays(0);
@@ -113,11 +154,13 @@ function initialiseStorage() {
 
   if (existing && Array.isArray(existing.machines) && Array.isArray(existing.bookings) && hasTodayBookings) {
     state.bookings = existing.bookings;
+    state.userName = getStoredUserName();
     return existing.machines;
   }
 
   state.bookings = sampleBookings;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ machines: machineCatalog, bookings: sampleBookings }));
+  state.userName = DEFAULT_USER;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ machines: machineCatalog, bookings: sampleBookings, userName: DEFAULT_USER }));
   return machineCatalog;
 }
 
@@ -131,12 +174,20 @@ function getMachines() {
 
 function persistMachines(machines) {
   const saved = safeLoad();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ machines, bookings: saved ? saved.bookings : state.bookings }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    machines,
+    bookings: saved ? saved.bookings : state.bookings,
+    userName: state.userName || DEFAULT_USER,
+  }));
 }
 
 function persistBookings() {
   const machines = getMachines();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ machines, bookings: state.bookings }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    machines,
+    bookings: state.bookings,
+    userName: state.userName || DEFAULT_USER,
+  }));
 }
 
 function getMachineStatusLabel(machine) {
@@ -159,6 +210,64 @@ function getMachineStatusLabel(machine) {
   return 'Ready';
 }
 
+function getMachineOwner(machineId) {
+  const booking = state.bookings
+    .filter((entry) => entry.machineId === machineId && (entry.status === 'scheduled' || entry.status === 'done'))
+    .sort((left, right) => new Date(`${left.date}T${left.time}:00`).getTime() - new Date(`${right.date}T${right.time}:00`).getTime())
+    .at(-1);
+
+  if (!booking) {
+    return null;
+  }
+
+  return booking.owner || null;
+}
+
+function getOwnerBadge(owner) {
+  if (!owner) {
+    return 'Available';
+  }
+
+  return owner === state.userName ? 'Yours' : `Booked by ${owner}`;
+}
+
+function getReadableMachineStatus(machine) {
+  if (!machine) {
+    return 'Ready';
+  }
+
+  if (machine.status === 'free') {
+    return 'Free now';
+  }
+
+  if (machine.status === 'broken') {
+    return 'Broken';
+  }
+
+  if (machine.status === 'in_use') {
+    const minutesLeft = Number(machine.remainingMinutes || 0);
+    if (minutesLeft > 0) {
+      return `Finishes in ${minutesLeft} min`;
+    }
+    return 'Finished 5 min ago';
+  }
+
+  if (machine.status === 'finished') {
+    const owner = getMachineOwner(machine.id);
+    if (owner) {
+      return owner === state.userName ? 'Your laundry is done' : `${owner}'s laundry is done`;
+    }
+
+    const minutesAgo = Number(machine.finishedMinutesAgo || machine.remainingMinutes || 0);
+    if (minutesAgo > 0) {
+      return `Finished ${formatRelativeTimeFromMinutes(minutesAgo)}`;
+    }
+    return 'Finished – waiting for pickup';
+  }
+
+  return machine.summary || 'Ready';
+}
+
 function getRelativeStatus(machine) {
   if (machine.status === 'free') {
     return 'Free now';
@@ -177,6 +286,11 @@ function getRelativeStatus(machine) {
   }
 
   if (machine.status === 'finished') {
+    const owner = getMachineOwner(machine.id);
+    if (owner) {
+      return owner === state.userName ? 'Your laundry is done' : `${owner}'s laundry is done`;
+    }
+
     const minutesAgo = Number(machine.finishedMinutesAgo || machine.remainingMinutes || 0);
     if (minutesAgo > 0) {
       return `Finished ${formatRelativeTimeFromMinutes(minutesAgo)}`;
@@ -215,12 +329,11 @@ function formatDate(value) {
 function ensureBookingState() {
   const now = Date.now();
   state.bookings = (safeLoad()?.bookings || sampleBookings).map((booking) => {
-    if (booking.status === 'done') {
-      return booking;
-    }
-
     const bookingDateTime = new Date(`${booking.date}T${booking.time}:00`);
-    const isDone = bookingDateTime.getTime() <= now;
+    const started = bookingDateTime.getTime() <= now;
+    const elapsedMinutes = started ? (now - bookingDateTime.getTime()) / 60000 : 0;
+    const isDone = started && elapsedMinutes >= 60;
+
     return {
       ...booking,
       status: isDone ? 'done' : 'scheduled',
@@ -230,22 +343,48 @@ function ensureBookingState() {
 
 function syncMachineStateFromBookings() {
   const machines = getMachines();
+  const now = Date.now();
 
   machines.forEach((machine) => {
     if (machine.status === 'broken') {
       return;
     }
 
-    const booking = state.bookings.find((entry) => entry.machineId === machine.id && entry.status === 'done');
-    if (booking) {
-      machine.status = 'finished';
-      machine.summary = 'Finished – waiting for pickup';
-      machine.remainingMinutes = 0;
-      machine.finishedMinutesAgo = Math.max(1, Math.round((Date.now() - new Date(`${booking.date}T${booking.time}:00`).getTime()) / 60000));
+    const relevantBooking = state.bookings
+      .filter((entry) => entry.machineId === machine.id && (entry.status === 'scheduled' || entry.status === 'done'))
+      .sort((left, right) => new Date(`${left.date}T${left.time}:00`).getTime() - new Date(`${right.date}T${right.time}:00`).getTime())
+      .at(-1);
+
+    if (!relevantBooking) {
+      if (machine.status === 'finished' || machine.status === 'in_use') {
+        machine.status = 'free';
+        machine.summary = 'Ready to use';
+        machine.remainingMinutes = 0;
+        delete machine.finishedMinutesAgo;
+      }
       return;
     }
 
-    if (machine.status === 'finished') {
+    const bookingDateTime = new Date(`${relevantBooking.date}T${relevantBooking.time}:00`).getTime();
+    const elapsedMinutes = (now - bookingDateTime) / 60000;
+
+    if (bookingDateTime <= now && elapsedMinutes < 60) {
+      machine.status = 'in_use';
+      machine.summary = 'Booked';
+      machine.remainingMinutes = Math.max(1, 60 - Math.floor(elapsedMinutes));
+      delete machine.finishedMinutesAgo;
+      return;
+    }
+
+    if (bookingDateTime <= now && elapsedMinutes >= 60) {
+      machine.status = 'finished';
+      machine.summary = 'Finished – waiting for pickup';
+      machine.remainingMinutes = 0;
+      machine.finishedMinutesAgo = Math.max(1, Math.round(elapsedMinutes));
+      return;
+    }
+
+    if (machine.status === 'finished' || machine.status === 'in_use') {
       machine.status = 'free';
       machine.summary = 'Ready to use';
       machine.remainingMinutes = 0;
@@ -258,7 +397,11 @@ function syncMachineStateFromBookings() {
 
 function saveState() {
   const machines = getMachines();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ machines, bookings: state.bookings }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    machines,
+    bookings: state.bookings,
+    userName: state.userName || DEFAULT_USER,
+  }));
 }
 
 function getMachineTypeSummary(type) {
@@ -334,6 +477,8 @@ function renderMachineGrid() {
 
     const statusText = getRelativeStatus(machine);
     const machineStatus = getMachineStatusLabel(machine);
+    const owner = getMachineOwner(machine.id);
+    const ownerLabel = getOwnerBadge(owner);
 
     card.innerHTML = `
       <div class="machine-top">
@@ -345,6 +490,7 @@ function renderMachineGrid() {
         <span class="status-pill">${machineStatus}</span>
         <span class="machine-info">${statusText || ''}</span>
       </div>
+      <div class="machine-owner ${owner === state.userName ? 'is-mine' : ''}">${ownerLabel}</div>
     `;
 
     card.addEventListener('click', () => {
@@ -402,6 +548,40 @@ function renderHelperPanel() {
   `;
 }
 
+function renderMyMachines() {
+  const container = document.getElementById('myMachinesSection');
+  const list = document.getElementById('myMachinesList');
+  const myBookings = state.bookings.filter((booking) => booking.owner === state.userName && (booking.status === 'scheduled' || booking.status === 'done'));
+
+  if (!myBookings.length) {
+    container.classList.remove('visible');
+    list.innerHTML = '';
+    return;
+  }
+
+  container.classList.add('visible');
+  const items = myBookings
+    .map((booking) => {
+      const machine = getMachines().find((current) => current.id === booking.machineId);
+      const statusText = machine ? getRelativeStatus(machine) : 'Machine unavailable';
+      return `
+        <li class="my-machine-item">
+          <div>
+            <strong>${machine ? machine.name : 'Machine'}</strong>
+            <span>${statusText}</span>
+          </div>
+          <button type="button" class="small-cancel" data-cancel-booking="${booking.id}">Cancel</button>
+        </li>
+      `;
+    })
+    .join('');
+
+  list.innerHTML = `<ul class="my-machines-list">${items}</ul>`;
+  list.querySelectorAll('[data-cancel-booking]').forEach((button) => {
+    button.addEventListener('click', () => cancelBooking(button.dataset.cancelBooking));
+  });
+}
+
 function renderBookingSection() {
   const container = document.getElementById('bookingSection');
   const activeBookings = state.bookings.filter((booking) => booking.status === 'scheduled' || booking.status === 'done');
@@ -413,9 +593,25 @@ function renderBookingSection() {
   }
 
   const latestBooking = activeBookings[activeBookings.length - 1];
-  const machine = getMachines().find((current) => current.id === latestBooking.machineId) || { name: 'Machine', sizeKg: '' };
+  const machine = getMachines().find((current) => current.id === latestBooking.machineId) || { name: 'Machine', sizeKg: '', type: 'washer' };
   const details = clothesGuide[latestBooking.clothesType] || clothesGuide.cotton;
-  const tempLabel = `${details.label}: ${details.temp}°C`;
+  const isMine = latestBooking.owner === state.userName;
+
+  if (state.compactBooking) {
+    container.classList.add('visible');
+    container.innerHTML = `
+      <div class="booking-summary-line">
+        <span>My booking: ${machine.name}, today ${formatTime(latestBooking.time)}</span>
+        <button type="button" class="small-cancel" data-cancel-booking="${latestBooking.id}">Cancel</button>
+      </div>
+    `;
+
+    const cancelButton = container.querySelector('[data-cancel-booking]');
+    if (cancelButton) {
+      cancelButton.addEventListener('click', () => cancelBooking(latestBooking.id));
+    }
+    return;
+  }
 
   container.classList.add('visible');
   container.innerHTML = `
@@ -430,6 +626,10 @@ function renderBookingSection() {
          <strong>${machine.name} · ${machine.sizeKg}kg</strong>
        </div>
        <div class="booking-detail-item">
+         <span>Owner</span>
+         <strong>${isMine ? 'Yours' : `Booked by ${latestBooking.owner || 'someone'}`}</strong>
+       </div>
+       <div class="booking-detail-item">
          <span>Date</span>
          <strong>${formatDate(latestBooking.date)}</strong>
        </div>
@@ -437,14 +637,16 @@ function renderBookingSection() {
          <span>Time</span>
          <strong>${formatTime(latestBooking.time)}</strong>
        </div>
-       <div class="booking-detail-item">
-         <span>Clothes</span>
-         <strong>${details.label}</strong>
-       </div>
-       <div class="booking-detail-item">
-         <span>Suggested temp</span>
-         <strong>${details.temp}°C</strong>
-       </div>
+       ${machine.type === 'washer' ? `
+         <div class="booking-detail-item">
+           <span>Clothes</span>
+           <strong>${details.label}</strong>
+         </div>
+         <div class="booking-detail-item">
+           <span>Suggested temp</span>
+           <strong>${details.temp}°C</strong>
+         </div>
+       ` : ''}
      </div>
      <p class="booking-confirmation-copy">We'll remind you when your washing is done.</p>
      <div class="booking-actions confirmation-actions">
@@ -463,6 +665,7 @@ function renderBookingSection() {
   if (doneButton) {
     doneButton.addEventListener('click', () => {
       state.activeMachineType = null;
+      state.compactBooking = true;
       render();
     });
   }
@@ -483,16 +686,20 @@ function openBookingModal(machineId) {
   const dateInput = document.getElementById('bookingDate');
   const timeInput = document.getElementById('bookingTime');
   const tempHelp = document.getElementById('temperatureHelp');
+  const userNameInput = document.getElementById('userNameInput');
+  const machine = getMachines().find((current) => current.id === machineId) || getMachines()[0];
 
-  const freeMachines = getMachines().filter((machine) => machine.status === 'free');
-  const selectedMachine = freeMachines.find((machine) => machine.id === machineId) || freeMachines[0];
+  const freeMachines = getMachines().filter((current) => current.status === 'free');
+  const selectedMachine = freeMachines.find((current) => current.id === machineId) || freeMachines[0];
   state.selectedMachineId = selectedMachine ? selectedMachine.id : null;
+
+  userNameInput.value = state.userName || DEFAULT_USER;
 
   machineSelect.innerHTML = freeMachines
     .map(
-      (machine) => `
-        <button class="choice-chip ${machine.id === state.selectedMachineId ? 'selected' : ''}" type="button" data-machine-chip="${machine.id}">
-          ${machine.name} · ${machine.sizeKg}kg
+      (current) => `
+        <button class="choice-chip ${current.id === state.selectedMachineId ? 'selected' : ''}" type="button" data-machine-chip="${current.id}">
+          ${current.name} · ${current.sizeKg}kg
         </button>
       `,
     )
@@ -509,6 +716,21 @@ function openBookingModal(machineId) {
   const currentTime = getCurrentLocalTimeValue();
   dateInput.value = date;
   timeInput.value = currentTime;
+
+  const isWasher = machine && machine.type === 'washer';
+  const clothesFieldGroup = document.getElementById('clothesOptions').closest('.field-group');
+  const tempFieldGroup = document.getElementById('temperatureHelp').closest('.field-group');
+
+  clothesFieldGroup.style.display = isWasher ? 'grid' : 'none';
+  tempFieldGroup.style.display = isWasher ? 'grid' : 'none';
+
+  if (!isWasher) {
+    state.selectedClothesType = 'cotton';
+    tempHelp.innerHTML = '';
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    return;
+  }
 
   clothesOptions.innerHTML = Object.entries(clothesGuide)
     .map(
@@ -556,21 +778,35 @@ function closeBookingModal() {
 function confirmBooking() {
   const date = document.getElementById('bookingDate').value;
   const time = document.getElementById('bookingTime').value;
+  const userNameInput = document.getElementById('userNameInput');
+  const enteredName = (userNameInput?.value || '').trim();
 
   if (!state.selectedMachineId || !date || !time) {
     return;
   }
 
+  if (enteredName) {
+    state.userName = enteredName;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      machines: getMachines(),
+      bookings: state.bookings,
+      userName: state.userName,
+    }));
+  }
+
+  const machine = getMachines().find((current) => current.id === state.selectedMachineId);
   const booking = {
     id: `booking-${Date.now()}`,
     machineId: state.selectedMachineId,
     date,
     time,
-    clothesType: state.selectedClothesType,
+    clothesType: machine && machine.type === 'washer' ? state.selectedClothesType : 'cotton',
+    owner: state.userName,
     createdAt: Date.now(),
     status: 'scheduled',
   };
 
+  state.compactBooking = false;
   state.bookings.push(booking);
   saveState();
 
@@ -607,6 +843,8 @@ function cancelBooking(bookingId) {
 
 function attachEvents() {
   document.getElementById('bookSlotButton').addEventListener('click', () => {
+    state.compactBooking = false;
+    state.activeMachineType = null;
     const freeMachines = getMachines().filter((machine) => machine.status === 'free');
     if (freeMachines.length) {
       openBookingModal(freeMachines[0].id);
@@ -619,6 +857,7 @@ function attachEvents() {
   document.getElementById('cancelBookingButton').addEventListener('click', closeBookingModal);
   document.getElementById('confirmBookingButton').addEventListener('click', confirmBooking);
   document.getElementById('refreshButton').addEventListener('click', () => {
+    state.activeMachineType = null;
     render();
   });
 
@@ -628,17 +867,36 @@ function attachEvents() {
       renderHelperPanel();
     });
   });
+
+  const resetDemoButton = document.getElementById('resetDemoButton');
+  if (resetDemoButton) {
+    resetDemoButton.addEventListener('click', resetDemo);
+  }
+}
+
+function resetDemo() {
+  localStorage.removeItem(STORAGE_KEY);
+  state.bookings = sampleBookings.map((booking) => ({ ...booking, owner: booking.owner || DEFAULT_USER }));
+  state.selectedMachineId = null;
+  state.activeMachineType = null;
+  state.compactBooking = false;
+  state.userName = DEFAULT_USER;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ machines: machineCatalog, bookings: state.bookings, userName: DEFAULT_USER }));
+  render();
 }
 
 function render() {
   ensureBookingState();
   syncMachineStateFromBookings();
+  renderMyMachines();
   renderMachineGrid();
   renderHelperPanel();
   renderBookingSection();
 }
 
 function bootstrap() {
+  state.activeMachineType = null;
+  state.compactBooking = false;
   initialiseStorage();
   attachEvents();
   render();

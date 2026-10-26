@@ -141,6 +141,39 @@ button:active {
   padding: 16px;
 }
 
+.my-machines-panel {
+  display: none;
+}
+
+.my-machines-panel.visible {
+  display: block;
+}
+
+.my-machines-list {
+  display: grid;
+  gap: 8px;
+}
+
+.my-machine-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-alt);
+  font-size: 0.9rem;
+}
+
+.my-machine-item strong {
+  font-size: 0.9rem;
+}
+
+.my-machine-item .small-cancel {
+  min-height: 30px;
+}
+
 .panel-heading {
   display: flex;
   justify-content: space-between;
@@ -342,6 +375,24 @@ button:active {
   color: var(--muted);
 }
 
+.machine-owner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--chip);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.machine-owner.is-mine {
+  background: var(--green-soft);
+}
+
 .helper-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -391,6 +442,34 @@ button:active {
 
 .booking-panel.visible {
   display: block;
+}
+
+.booking-summary-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-alt);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.booking-summary-line span {
+  flex: 1;
+}
+
+.small-cancel {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: var(--chip);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .booking-card {
@@ -619,6 +698,16 @@ input[type="time"] {
 .modal-actions .primary-button,
 .modal-actions .secondary-button {
   flex: 1;
+}
+
+.reset-demo-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 4px auto 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
 }
 
 @media (min-width: 700px) {
