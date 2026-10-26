@@ -70,6 +70,28 @@ const sampleBookings = [
     status: 'scheduled',
     cache: false,
   },
+  {
+    id: 'sample-booking-5',
+    machineId: 'washer-3',
+    date: getDateInDays(0),
+    time: getCurrentLocalTimeValue(),
+    clothesType: 'synthetics',
+    owner: 'Flat 2A',
+    createdAt: Date.now() - 1000 * 60 * 15,
+    status: 'scheduled',
+    cache: false,
+  },
+  {
+    id: 'sample-booking-6',
+    machineId: 'washer-4',
+    date: getDateInDays(0),
+    time: getCurrentLocalTimeValue(),
+    clothesType: 'delicates',
+    owner: 'Flat 4E',
+    createdAt: Date.now() - 1000 * 60 * 10,
+    status: 'scheduled',
+    cache: false,
+  },
 ];
 
 const state = {
@@ -223,9 +245,9 @@ function getMachineOwner(machineId) {
   return booking.owner || null;
 }
 
-function getOwnerBadge(owner) {
+function getOwnerBadge(owner, machine) {
   if (!owner) {
-    return 'Available';
+    return machine && machine.status !== 'free' ? 'Booked by someone' : 'Available';
   }
 
   return owner === state.userName ? 'Yours' : `Booked by ${owner}`;
@@ -478,7 +500,7 @@ function renderMachineGrid() {
     const statusText = getRelativeStatus(machine);
     const machineStatus = getMachineStatusLabel(machine);
     const owner = getMachineOwner(machine.id);
-    const ownerLabel = getOwnerBadge(owner);
+    const ownerLabel = getOwnerBadge(owner, machine);
 
     card.innerHTML = `
       <div class="machine-top">
@@ -584,91 +606,8 @@ function renderMyMachines() {
 
 function renderBookingSection() {
   const container = document.getElementById('bookingSection');
-  const activeBookings = state.bookings.filter((booking) => booking.status === 'scheduled' || booking.status === 'done');
-
-  if (!activeBookings.length) {
-    container.classList.remove('visible');
-    container.innerHTML = '';
-    return;
-  }
-
-  const latestBooking = activeBookings[activeBookings.length - 1];
-  const machine = getMachines().find((current) => current.id === latestBooking.machineId) || { name: 'Machine', sizeKg: '', type: 'washer' };
-  const details = clothesGuide[latestBooking.clothesType] || clothesGuide.cotton;
-  const isMine = latestBooking.owner === state.userName;
-
-  if (state.compactBooking) {
-    container.classList.add('visible');
-    container.innerHTML = `
-      <div class="booking-summary-line">
-        <span>My booking: ${machine.name}, today ${formatTime(latestBooking.time)}</span>
-        <button type="button" class="small-cancel" data-cancel-booking="${latestBooking.id}">Cancel</button>
-      </div>
-    `;
-
-    const cancelButton = container.querySelector('[data-cancel-booking]');
-    if (cancelButton) {
-      cancelButton.addEventListener('click', () => cancelBooking(latestBooking.id));
-    }
-    return;
-  }
-
-  container.classList.add('visible');
-  container.innerHTML = `
-   <div class="booking-card booking-confirmation">
-     <div class="booking-header-row">
-       <span class="booking-label">My booking</span>
-     </div>
-     <h3 class="booking-confirmation-title">✓ Booked!</h3>
-     <div class="booking-detail-list">
-       <div class="booking-detail-item">
-         <span>Machine</span>
-         <strong>${machine.name} · ${machine.sizeKg}kg</strong>
-       </div>
-       <div class="booking-detail-item">
-         <span>Owner</span>
-         <strong>${isMine ? 'Yours' : `Booked by ${latestBooking.owner || 'someone'}`}</strong>
-       </div>
-       <div class="booking-detail-item">
-         <span>Date</span>
-         <strong>${formatDate(latestBooking.date)}</strong>
-       </div>
-       <div class="booking-detail-item">
-         <span>Time</span>
-         <strong>${formatTime(latestBooking.time)}</strong>
-       </div>
-       ${machine.type === 'washer' ? `
-         <div class="booking-detail-item">
-           <span>Clothes</span>
-           <strong>${details.label}</strong>
-         </div>
-         <div class="booking-detail-item">
-           <span>Suggested temp</span>
-           <strong>${details.temp}°C</strong>
-         </div>
-       ` : ''}
-     </div>
-     <p class="booking-confirmation-copy">We'll remind you when your washing is done.</p>
-     <div class="booking-actions confirmation-actions">
-       <button class="primary-button" type="button" data-booking-done>Done</button>
-       <button class="cancel-button" type="button" data-cancel-booking="${latestBooking.id}">Cancel booking</button>
-     </div>
-   </div>
-  `;
-
-  const cancelButton = container.querySelector('[data-cancel-booking]');
-  if (cancelButton) {
-    cancelButton.addEventListener('click', () => cancelBooking(latestBooking.id));
-  }
-
-  const doneButton = container.querySelector('[data-booking-done]');
-  if (doneButton) {
-    doneButton.addEventListener('click', () => {
-      state.activeMachineType = null;
-      state.compactBooking = true;
-      render();
-    });
-  }
+  container.classList.remove('visible');
+  container.innerHTML = '';
 }
 
 function bookingInfo(booking) {
